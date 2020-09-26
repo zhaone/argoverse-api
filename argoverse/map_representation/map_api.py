@@ -786,9 +786,9 @@ class ArgoverseMap:
                 curr_candidate_cl = np.vstack((curr_candidate_cl, curr_candidate))
             candidate_cl.append(curr_candidate_cl)
         return candidate_cl
-
+    # modified by zhaoyi
     def get_candidate_centerlines_for_traj(
-        self, xy: np.ndarray, city_name: str, viz: bool = False, max_search_radius: float = 50.0
+        self, xy: np.ndarray, city_name: str, viz: bool = False, max_search_radius: float = 50.0, forward: bool = True, backward: bool = True
     ) -> List[np.ndarray]:
         """ Get centerline candidates upto a threshold. .
 
@@ -805,7 +805,7 @@ class ArgoverseMap:
         Returns:
             candidate_centerlines: List of candidate centerlines
         """
-
+        assert forward or backward, "No searching directions are given!!"
         # Get all lane candidates within a bubble
         manhattan_threshold = 2.5
         curr_lane_candidates = self.get_lane_ids_in_xy_bbox(xy[-1, 0], xy[-1, 1], city_name, manhattan_threshold)
@@ -824,31 +824,32 @@ class ArgoverseMap:
         # DFS to get all successor and predecessor candidates
         obs_pred_lanes: List[Sequence[int]] = []
         for lane in curr_lane_candidates:
-            candidates_future = self.dfs(lane, city_name, 0, dfs_threshold)
-            candidates_past = self.dfs(lane, city_name, 0, dfs_threshold, True)
-
+            if forward:
+                candidates_future = self.dfs(lane, city_name, 0, dfs_threshold)
+            if backward:
+                candidates_past = self.dfs(lane, city_name, 0, dfs_threshold, True)
             # Merge past and future
-            for past_lane_seq in candidates_past:
-                for future_lane_seq in candidates_future:
-                    assert past_lane_seq[-1] == future_lane_seq[0], "Incorrect DFS for candidate lanes past and future"
-                    obs_pred_lanes.append(past_lane_seq + future_lane_seq[1:])
-
+            if forward and backward:
+                for past_lane_seq in candidates_past:
+                    for future_lane_seq in candidates_future:
+                        assert past_lane_seq[-1] == future_lane_seq[0], "Incorrect DFS for candidate lanes past and future"
+                        obs_pred_lanes.append(past_lane_seq + future_lane_seq[1:])
+            elif forward:
+                obs_pred_lanes.extend(candidates_future)
+            elif backward:
+                obs_pred_lanes.extend(candidates_past)
         # Removing overlapping lanes
         obs_pred_lanes = remove_overlapping_lane_seq(obs_pred_lanes)
-
         # Remove unnecessary extended predecessors
-        obs_pred_lanes = self.remove_extended_predecessors(obs_pred_lanes, xy, city_name)
-
+        if backward:
+            obs_pred_lanes = self.remove_extended_predecessors(obs_pred_lanes, xy, city_name)
         # Getting candidate centerlines
         candidate_cl = self.get_cl_from_lane_seq(obs_pred_lanes, city_name)
-
         # Reduce the number of candidates based on distance travelled along the centerline
         candidate_centerlines = filter_candidate_centerlines(xy, candidate_cl)
-
         # If no candidate found using above criteria, take the onces along with travel is the maximum
         if len(candidate_centerlines) < 1:
             candidate_centerlines = get_centerlines_most_aligned_with_trajectory(xy, candidate_cl)
-
         if viz:
             plt.figure(0, figsize=(8, 7))
             for centerline_coords in candidate_centerlines:
