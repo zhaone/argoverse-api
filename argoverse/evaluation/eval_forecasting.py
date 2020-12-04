@@ -192,7 +192,7 @@ def compute_forecasting_metrics(
     metric_results = get_displacement_errors_and_miss_rate(
         forecasted_trajectories, gt_trajectories, max_n_guesses, horizon, miss_threshold, forecasted_probabilities
     )
-    metric_results["DAC"] = get_drivable_area_compliance(forecasted_trajectories, city_names, max_n_guesses)
+    # metric_results["DAC"] = get_drivable_area_compliance(forecasted_trajectories, city_names, max_n_guesses)
 
     print("------------------------------------------------")
     print(f"Prediction Horizon : {horizon}, Max #guesses (K): {max_n_guesses}")
